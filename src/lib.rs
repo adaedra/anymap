@@ -46,14 +46,7 @@ where
             .and_then(|b| b.downcast_ref::<V>().ok_or(Error::TypeMismatch))
     }
 
-    pub fn get_clone<V>(&mut self, k: &K) -> Result<V, Error>
-    where
-        V: Clone + 'static,
-    {
-        self.get(k).map(|b: &V| (*b).clone())
-    }
-
-    pub fn insert<V>(&mut self, k: K, v: V) -> Result<Option<Box<V>>, (Error, V)>
+    pub fn insert<V>(&mut self, k: K, v: V) -> Result<Option<V>, (Error, V)>
     where
         V: 'static,
     {
@@ -66,10 +59,10 @@ where
         Ok(self
             .h
             .insert(k, Box::new(v))
-            .map(|b| b.downcast::<V>().unwrap()))
+            .map(|b| *b.downcast::<V>().unwrap()))
     }
 
-    pub fn remove<V>(&mut self, k: &K) -> Result<Box<V>, Error>
+    pub fn remove<V>(&mut self, k: &K) -> Result<V, Error>
     where
         V: 'static,
     {
@@ -79,7 +72,7 @@ where
         }
         drop(prev);
 
-        Ok(self.h.remove(k).unwrap().downcast::<V>().unwrap())
+        Ok(*self.h.remove(k).unwrap().downcast::<V>().unwrap())
     }
 }
 
@@ -110,16 +103,12 @@ mod tests {
     fn normal() {
         let mut m = AnyMap::<&'static str>::new();
         assert_eq!(Ok(None), m.insert::<u32>(&"foo", 1));
-        assert_eq!(
-            Ok(Some(1)),
-            m.insert::<u32>(&"foo", 42).map(|r| r.map(|b| *b))
-        );
+        assert_eq!(Ok(Some(1)), m.insert::<u32>(&"foo", 42));
 
         assert_eq!(true, m.contains_key(&"foo"));
         assert_eq!(Ok(()), m.contains_key_typed::<u32>(&"foo"));
         assert_eq!(Ok(42), m.get::<u32>(&"foo").map(|r| *r));
-        assert_eq!(Ok(42), m.get_clone::<u32>(&"foo"));
-        assert_eq!(Ok(42), m.remove::<u32>(&"foo").map(|b| *b));
+        assert_eq!(Ok(42), m.remove::<u32>(&"foo"));
         assert_eq!(Err(Error::KeyNotFound), m.remove::<u32>(&"foo"));
     }
 
